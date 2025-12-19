@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
+    <title>Groq Chatbot</title>
+    
+    <style>
+        body {
+            font-family: serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Background Video */
+        #background-video {
+            position: fixed;
+            top: 20;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: -1;
+        }
+
+        .chat-container {
+            width: 390px;
+            background: transparent;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0.6, 0.5, 1.1);
+            z-index: 1;
+            position: relative;
+            padding: 10px;
+        }
+
+        .chat-header {
+            background-color: #f43f3ff4;
+            color: white;
+            padding: 10px;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .search-bar {
+            display: flex;
+            align-items: center;
+            padding: 8px;
+            background: white;
+            border-radius: 20px;
+            margin: 10px auto;
+            width: 90%;
+            box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .search-bar input {
+            flex: 1;
+            border: none;
+            outline: none;
+            padding: 8px;
+            font-size: 14px;
+            border-radius: 20px;
+        }
+
+        .search-bar button {
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            padding: 8px;
+            font-size: 16px;
+            color: #e1427f;
+        }
+
+        .chat-messages {
+            height: 300px;
+            overflow-y: auto;
+            padding: 10px;
+        }
+
+        .message {
+            margin-bottom: 10px;
+            padding: 8px 12px;
+            border-radius: 20px;
+            max-width: 80%;
+            animation: fadeIn 0.5s ease-out;
+            word-wrap: break-word;
+        }
+
+        .user-message {
+            background-color: #f18298;
+            color: white;
+            align-self: flex-end;
+            margin-left: auto;
+        }
+
+        .bot-message {
+            background-color: #e2e8f0;
+            color: #2d3748;
+        }
+
+        .chat-input {
+            display: flex;
+            padding: 10px;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        .chat-input button {
+            padding: 8px 16px;
+            background-color: #e1427f;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            margin-right: 5px;
+        }
+
+        .chat-input button:hover {
+            background-color: #ce3131;
+        }
+
+        .chat-input button:disabled {
+            background-color: #c0a0be;
+            cursor: not-allowed;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Background Video -->
+    <video id="background-video" autoplay muted loop>
+        <source src="video2.mp4" type="video/mp4">
+        Your browser does not support the video tag.
+    </video>
+
+    <!-- Chat Container -->
+    <div class="chat-container">
+        <div class="chat-header"><h4><i class="fas fa-user-plus icon"></i> Welcome sir!</h4></div>
+
+        <!-- Search Bar -->
+        <div class="search-bar">
+            <input type="text" id="searchInput" placeholder="Type your message...">
+            <button id="searchBtn"><i class="fa fa-search"></i></button>
+        </div>
+
+        <div class="chat-messages" id="chatMessages"></div>
+
+        <div class="chat-input">
+            <button id="startBtn"><i class="fa-solid fa-headphones"></i> Start Listening</button>
+            <button id="stopSpeakingBtn" disabled><i class="fa-solid fa-volume-high"></i> Stop Speaking</button>
+            <button id="clearBtn"><i class="fa-solid fa-broom"></i> Clear Chat</button>
+        </div>
+    </div>
+
+    <script>
+        const GROQ_API_KEY = "";
+        const GROQ_API_URL = "";
+
+        const chatMessages = document.getElementById('chatMessages');
+        const startBtn = document.getElementById('startBtn');
+        const stopSpeakingBtn = document.getElementById('stopSpeakingBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const searchInput = document.getElementById('searchInput');
+        const searchBtn = document.getElementById('searchBtn');
+
+        let isSpeaking = false;
+
+        function addMessage(text, isUser) {
+            const messageElement = document.createElement('div');
+            messageElement.classList.add('message', isUser ? 'user-message' : 'bot-message');
+            messageElement.textContent = text;
+            chatMessages.appendChild(messageElement);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        async function getBotResponse(userInput) {
+            try {
+                const response = await fetch(GROQ_API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${GROQ_API_KEY}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        model: "mixtral-8x7b-32768",
+                        messages: [{ role: "user", content: userInput }],
+                        max_tokens: 150
+                    })
+                });
+
+                const data = await response.json();
+                return data.choices?.[0]?.message?.content.trim() || "I couldn't understand that.";
+            } catch (error) {
+                console.error('Error:', error);
+                return "I'm sorry, I encountered an error.";
+            }
+        }
+
+        function speakText(text) {
+            return new Promise((resolve) => {
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.onend = () => {
+                    isSpeaking = false;
+                    stopSpeakingBtn.disabled = true;
+                    resolve();
+                };
+                isSpeaking = true;
+                stopSpeakingBtn.disabled = false;
+                speechSynthesis.speak(utterance);
+            });
+        }
+
+        searchBtn.addEventListener('click', async () => {
+            const userInput = searchInput.value.trim();
+            if (userInput) {
+                addMessage(userInput, true);
+                searchInput.value = '';
+                const botResponse = await getBotResponse(userInput);
+                addMessage(botResponse, false);
+                await speakText(botResponse);
+            }
+        });
+
+        searchInput.addEventListener('keypress', (event) => {
+            if (event.key === 'Enter') searchBtn.click();
+        });
+
+        startBtn.addEventListener('click', () => {
+            const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+            recognition.lang = 'en-US';
+            recognition.start();
+
+            recognition.onresult = async (event) => {
+                const transcript = event.results[0][0].transcript;
+                addMessage(transcript, true);
+                const botResponse = await getBotResponse(transcript);
+                addMessage(botResponse, false);
+                await speakText(botResponse);
+            };
+        });
+
+        stopSpeakingBtn.addEventListener('click', () => speechSynthesis.cancel());
+
+        clearBtn.addEventListener('click', () => chatMessages.innerHTML = '');
+    </script>
+
+</body>
+</html>
